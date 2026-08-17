@@ -1,36 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# alterique — website
 
-## Getting Started
+Premium alterations, tailoring and garment care in Walthamstow, London.
+Next.js frontend + Express API (`server/`) for quote requests.
 
-First, run the development server:
+## Stack
+
+- **Frontend**: Next.js (App Router, JavaScript), Tailwind CSS v4, shadcn/ui
+- **Backend**: Express on Render free tier (`server/` — see its README)
+- **Database**: MongoDB Atlas · **Photo storage**: Cloudflare R2
+
+## Run locally
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev        # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The site works fully without the backend: the quote form falls back to
+WhatsApp and the contact form to email until `NEXT_PUBLIC_API_URL` is set
+(see `.env.example`).
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+## Where things live
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Path                | What                                                        |
+| ------------------- | ----------------------------------------------------------- |
+| `lib/site-config.js`| **All business details** — phone, address, hours, links     |
+| `lib/data/`         | Services, journal articles, gallery, testimonials (content) |
+| `components/`       | One file per section, grouped by page                       |
+| `app/`              | Pages, sitemap, robots, 404                                 |
+| `server/`           | Express API (quote + contact), Render-ready                 |
 
-## Learn More
+## Swapping in real photography
 
-To learn more about Next.js, take a look at the following resources:
+Every image renders through `components/shared/EditorialImage.jsx`. Drop the
+client's photos into `public/images/` and add `src: "/images/<file>.jpg"` to
+the matching image object in `lib/data/*` — placeholders disappear
+automatically.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Before launch (TODOs)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Confirm domain, email address and Instagram handle in `lib/site-config.js`
+- Replace the wordmark with the client's logo SVG (`components/layout/Wordmark.jsx`)
+  — "The Seasons" is Canva-licensed, so the logo must ship as SVG, not a webfont
+- Client review of all placeholder copy (services, journal, privacy policy)
+- Real photography via `lib/data/` + `public/images/`
+- Deploy `server/` to Render, set `NEXT_PUBLIC_API_URL`
+- GA4 + Search Console + Microsoft Clarity behind a consent banner
