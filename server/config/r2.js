@@ -1,4 +1,5 @@
-const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+const { S3Client, PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const crypto = require("crypto");
 
 /**
@@ -39,4 +40,26 @@ async function uploadPhoto(file) {
   return key;
 }
 
-module.exports = { uploadPhoto, r2Configured: !!configured };
+/**
+ * Public link for an uploaded photo. Uses R2_PUBLIC_URL (r2.dev or custom
+ * domain on the bucket) when set; otherwise falls back to a presigned URL
+ * valid for 7 days — the S3 API maximum.
+ */
+async function photoUrl(key) {
+  if (!key) return null;
+  if (process.env.R2_PUBLIC_URL) {
+    return `${process.env.R2_PUBLIC_URL.replace(/\/$/, "")}/${key}`;
+  }
+  if (!client) return null;
+  return getSignedUrl(
+    client,
+    new GetObjectCommand({ Bucket: process.env.R2_BUCKET, Key: key }),
+    { expiresIn: 7 * 24 * 60 * 60 }
+  );
+}
+
+async function photoUrls(keys) {
+  return (await Promise.all((keys || []).map(photoUrl))).filter(Boolean);
+}
+
+module.exports = { uploadPhoto, photoUrl, photoUrls, r2Configured: !!configured };

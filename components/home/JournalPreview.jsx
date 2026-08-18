@@ -2,9 +2,10 @@ import Link from "next/link";
 import SectionHeading from "@/components/shared/SectionHeading";
 import FadeIn from "@/components/shared/FadeIn";
 import JournalCard from "@/components/journal/JournalCard";
-import { journal } from "@/lib/data/journal";
+import { getJournal } from "@/lib/journal-source";
 
-export default function JournalPreview() {
+export default async function JournalPreview() {
+  const journal = await getJournal();
   const latest = journal.slice(0, 3);
   return (
     <section className="container-site py-18 sm:py-24">

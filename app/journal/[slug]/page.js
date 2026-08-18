@@ -2,19 +2,20 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import EditorialImage from "@/components/shared/EditorialImage";
 import CtaBand from "@/components/shared/CtaBand";
-import { journal, getArticle, formatDate } from "@/lib/data/journal";
+import { journal, formatDate } from "@/lib/data/journal";
+import { getJournalArticle } from "@/lib/journal-source";
 import { getService } from "@/lib/data/services";
 import { articleSchema, JsonLd } from "@/lib/schema";
 
-export const dynamicParams = false;
-
+// Articles added from the admin panel have slugs unknown at build time,
+// so dynamic params stay enabled (the Next.js default).
 export function generateStaticParams() {
   return journal.map((article) => ({ slug: article.slug }));
 }
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
-  const article = getArticle(slug);
+  const article = await getJournalArticle(slug);
   if (!article) return {};
   return {
     title: article.title,
@@ -26,7 +27,7 @@ export async function generateMetadata({ params }) {
 
 export default async function ArticlePage({ params }) {
   const { slug } = await params;
-  const article = getArticle(slug);
+  const article = await getJournalArticle(slug);
   if (!article) notFound();
 
   const service = getService(article.relatedService);

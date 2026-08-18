@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { siteConfig } from "@/lib/site-config";
 
 const INPUT_CLASSES =
   "w-full border border-ink/15 bg-transparent px-4 py-3.5 text-[15px] font-light placeholder:text-ink/40 focus:border-ambleside focus:outline-none transition-colors";
 
 export default function ContactForm() {
-  const [status, setStatus] = useState("idle"); // idle | sending | sent | error
+  const router = useRouter();
+  const [status, setStatus] = useState("idle"); // idle | sending | error
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -37,22 +39,11 @@ export default function ContactForm() {
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error("Request failed");
-      setStatus("sent");
       form.reset();
+      router.push("/thank-you?type=message");
     } catch {
       setStatus("error");
     }
-  }
-
-  if (status === "sent") {
-    return (
-      <div className="border border-ambleside/40 bg-linen-deep/50 p-8 text-center">
-        <p className="text-lg font-light">Thank you — message received.</p>
-        <p className="mt-2 text-sm font-light text-ink/65">
-          We&rsquo;ll come back to you as soon as we can, usually the same day.
-        </p>
-      </div>
-    );
   }
 
   return (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PhotoDropzone from "@/components/quote/PhotoDropzone";
 import { siteConfig } from "@/lib/site-config";
@@ -35,9 +36,10 @@ function FieldLabel({ num, children, hint }) {
 }
 
 export default function QuoteForm() {
+  const router = useRouter();
   const [service, setService] = useState("");
   const [photos, setPhotos] = useState([]);
-  const [status, setStatus] = useState("idle"); // idle | sending | sent | error
+  const [status, setStatus] = useState("idle"); // idle | sending | error
   const [errorMsg, setErrorMsg] = useState("");
 
   function addPhotos(newPhotos) {
@@ -96,28 +98,10 @@ export default function QuoteForm() {
 
       photos.forEach((p) => URL.revokeObjectURL(p.url));
       setPhotos([]);
-      setStatus("sent");
+      router.push("/thank-you?type=quote");
     } catch {
       setStatus("error");
     }
-  }
-
-  if (status === "sent") {
-    return (
-      <div className="w-full max-w-140 border border-ambleside/40 bg-linen-deep/50 p-10 text-center">
-        <p className="display text-3xl">Thank you</p>
-        <p className="mx-auto mt-4 max-w-sm text-[15px] font-light leading-relaxed text-ink/70">
-          Your request is with us. We&rsquo;ll reply with a considered quote,
-          usually the same day — keep an eye on your phone and inbox.
-        </p>
-        <Link
-          href="/"
-          className="mt-8 inline-block border-b border-champagne pb-0.5 text-sm text-ink"
-        >
-          Back to the homepage
-        </Link>
-      </div>
-    );
   }
 
   return (

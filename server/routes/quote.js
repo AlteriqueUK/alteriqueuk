@@ -1,8 +1,9 @@
 const express = require("express");
 const multer = require("multer");
 const QuoteRequest = require("../models/QuoteRequest");
-const { uploadPhoto } = require("../config/r2");
-const { notifyBusiness, confirmCustomer } = require("../utils/mailer");
+const Customer = require("../models/Customer");
+const { uploadPhoto, photoUrls } = require("../config/r2");
+const { notifyBusiness, notificationHtml } = require("../utils/mailer");
 
 const router = express.Router();
 
@@ -12,6 +13,17 @@ const upload = multer({
   fileFilter: (req, file, cb) =>
     cb(null, file.mimetype.startsWith("image/")),
 });
+
+async function addCustomerFromQuote({ name, email, phone }) {
+  try {
+    // One customer record per person — match on email (or phone if no email)
+    const match = email ? { email } : phone ? { phone } : null;
+    if (match && (await Customer.exists(match))) return;
+    await Customer.create({ name, email, phone, comment: "website" });
+  } catch (err) {
+    console.error("Customer auto-add failed:", err.message);
+  }
+}
 
 router.post("/", upload.array("photos", 6), async (req, res, next) => {
   try {
@@ -36,25 +48,38 @@ router.post("/", upload.array("photos", 6), async (req, res, next) => {
       photoKeys,
     });
 
-    // Notifications are fire-and-forget — the quote is already stored
-    notifyBusiness(
-      `New quote request — ${service}`,
-      [
-        `Service: ${service}`,
-        `Name: ${name}`,
-        `Phone: ${phone || "—"}`,
-        `Email: ${email || "—"}`,
-        `Photos: ${photoKeys.length}`,
-        "",
-        description,
-      ].join("\n")
-    );
-    confirmCustomer(
-      email,
-      "Your quote request — alterique",
-      `Hello ${name},\n\nThank you for your quote request. We've received your details${
-        photoKeys.length ? " and photographs" : ""
-      } and will reply with a considered quote, usually the same day.\n\nalterique\n29 Queens Rd, London E17 8PY\n07887 255558`
+    // Customer list entry + notifications are fire-and-forget — the quote is
+    // already stored, so none of these can lose it
+    addCustomerFromQuote({ name, email, phone });
+
+    photoUrls(photoKeys).then((urls) =>
+      notifyBusiness(
+        "Here is A New Quotation from Customer",
+        [
+          `Service: ${service}`,
+          `Name: ${name}`,
+          `Phone: ${phone || "—"}`,
+          `Email: ${email || "—"}`,
+          "",
+          description,
+          "",
+          ...urls.map((u, i) => `Photo ${i + 1}: ${u}`),
+        ].join("\n"),
+        {
+          replyTo: email || undefined,
+          html: notificationHtml(
+            "Here is A New Quotation from Customer",
+            [
+              ["Service", service],
+              ["Name", name],
+              ["Phone", phone],
+              ["Email", email],
+              ["Description", description],
+            ],
+            { links: urls.map((url, i) => ({ label: `Photo ${i + 1}`, url })) }
+          ),
+        }
+      )
     );
 
     res.status(201).json({ id: quote._id });

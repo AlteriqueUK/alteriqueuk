@@ -1,7 +1,7 @@
 import JournalCard from "@/components/journal/JournalCard";
 import FadeIn from "@/components/shared/FadeIn";
 import CtaBand from "@/components/shared/CtaBand";
-import { journal } from "@/lib/data/journal";
+import { getJournal } from "@/lib/journal-source";
 
 export const metadata = {
   title: "Journal — Notes on garment care",
@@ -10,7 +10,8 @@ export const metadata = {
   alternates: { canonical: "/journal" },
 };
 
-export default function JournalPage() {
+export default async function JournalPage() {
+  const journal = await getJournal();
   return (
     <>
       <section className="container-site py-14 sm:py-16">

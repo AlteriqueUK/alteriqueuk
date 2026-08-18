@@ -1,9 +1,10 @@
 import { siteConfig } from "@/lib/site-config";
 import { services } from "@/lib/data/services";
-import { journal } from "@/lib/data/journal";
+import { getJournal } from "@/lib/journal-source";
 
-export default function sitemap() {
+export default async function sitemap() {
   const base = siteConfig.siteUrl;
+  const journal = await getJournal();
 
   const staticPages = ["", "/gallery", "/journal", "/quote", "/contact"].map(
     (path) => ({
