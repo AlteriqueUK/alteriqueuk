@@ -40,6 +40,20 @@ async function uploadPhoto(file) {
   return key;
 }
 
+// The S3 API endpoint only answers signed requests, so using it as the public
+// base makes every photo link 400. Ignore it and sign links instead.
+function publicBase() {
+  const base = process.env.R2_PUBLIC_URL;
+  if (!base) return null;
+  if (/\.r2\.cloudflarestorage\.com/i.test(base)) {
+    console.warn(
+      "R2_PUBLIC_URL points at the S3 API endpoint — ignoring it and using presigned links. Set it to the bucket's public r2.dev URL or a custom domain."
+    );
+    return null;
+  }
+  return base.replace(/\/$/, "");
+}
+
 /**
  * Public link for an uploaded photo. Uses R2_PUBLIC_URL (r2.dev or custom
  * domain on the bucket) when set; otherwise falls back to a presigned URL
@@ -47,8 +61,9 @@ async function uploadPhoto(file) {
  */
 async function photoUrl(key) {
   if (!key) return null;
-  if (process.env.R2_PUBLIC_URL) {
-    return `${process.env.R2_PUBLIC_URL.replace(/\/$/, "")}/${key}`;
+  const base = publicBase();
+  if (base) {
+    return `${base}/${key}`;
   }
   if (!client) return null;
   return getSignedUrl(
