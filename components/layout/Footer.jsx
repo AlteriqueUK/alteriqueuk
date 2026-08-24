@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import Wordmark from "@/components/layout/Wordmark";
 import { siteConfig, fullAddress } from "@/lib/site-config";
@@ -17,7 +18,14 @@ export default function Footer() {
       <div className="container-site grid gap-12 py-16 sm:grid-cols-2 lg:grid-cols-4 lg:py-20">
         {/* Brand */}
         <div>
-          <Wordmark className="text-linen" />
+          <Image
+            src="/images/logo-footer.png"
+            alt=""
+            width={100}
+            height={96}
+            className="h-12 w-auto"
+          />
+          <Wordmark className="mt-4 block text-linen" />
           <p className="mt-5 max-w-xs text-sm font-light leading-relaxed text-linen/60">
             Specialists in expert tailoring, alterations and garment care —
             trusted with the pieces that matter.
