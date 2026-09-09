@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { api } from "@/components/admin/api";
+import { useRef, useState } from "react";
+import { api, apiUpload } from "@/components/admin/api";
 import { services } from "@/lib/data/services";
 import {
   useAdminList,
@@ -51,6 +51,8 @@ function slugify(title) {
     .slice(0, 80);
 }
 
+const MAX_PICTURE_MB = 8;
+
 const EMPTY = {
   title: "",
   slug: "",
@@ -59,6 +61,7 @@ const EMPTY = {
   readTime: "4 min read",
   excerpt: "",
   imageSrc: "",
+  imageKey: "",
   imageLabel: "",
   relatedService: "",
   published: true,
@@ -74,6 +77,7 @@ function toForm(post) {
     readTime: post.readTime || "",
     excerpt: post.excerpt || "",
     imageSrc: post.image?.src || "",
+    imageKey: post.image?.key || "",
     imageLabel: post.image?.label || "",
     relatedService: post.relatedService || "",
     published: post.published !== false,
@@ -89,10 +93,15 @@ function toPayload(form) {
     date: form.date,
     readTime: form.readTime,
     excerpt: form.excerpt,
-    image: form.imageSrc
-      ? { src: form.imageSrc, label: form.imageLabel, tone: "linen" }
-      : undefined,
-    relatedService: form.relatedService || undefined,
+    // Sent in full every time, so clearing the picture or the related service
+    // actually clears it instead of leaving the old value in place
+    image: {
+      src: form.imageSrc,
+      key: form.imageKey,
+      label: form.imageLabel,
+      tone: "linen",
+    },
+    relatedService: form.relatedService,
     published: form.published,
     body: textToBody(form.content),
   };
@@ -215,19 +224,11 @@ export default function JournalTab({ onUnauthorised }) {
             onChange={set("readTime")}
             className={INPUT}
           />
-          <input
-            placeholder="Image URL"
-            aria-label="Image URL"
-            value={form.imageSrc}
-            onChange={set("imageSrc")}
-            className={INPUT}
-          />
-          <input
-            placeholder="Image description (alt text)"
-            aria-label="Image description"
-            value={form.imageLabel}
-            onChange={set("imageLabel")}
-            className={INPUT}
+          <PictureField
+            form={form}
+            setForm={setForm}
+            setError={setError}
+            onUnauthorised={onUnauthorised}
           />
           <select
             value={form.relatedService}
@@ -297,19 +298,29 @@ export default function JournalTab({ onUnauthorised }) {
               key={post._id}
               className="flex flex-wrap items-center justify-between gap-3 border border-ink/10 p-4"
             >
-              <div className="min-w-0">
-                <p className="truncate font-light">
-                  {post.title}
-                  {!post.published && (
-                    <span className="ml-2 text-xs uppercase tracking-wide text-ink/45">
-                      hidden
-                    </span>
-                  )}
-                </p>
-                <p className="mt-0.5 text-xs font-light text-ink/50">
-                  /journal/{post.slug} · {post.category || "Uncategorised"} ·{" "}
-                  {post.date || "no date"}
-                </p>
+              <div className="flex min-w-0 items-center gap-3">
+                {post.image?.src && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={post.image.src}
+                    alt=""
+                    className="h-12 w-16 shrink-0 border border-ink/10 object-cover"
+                  />
+                )}
+                <div className="min-w-0">
+                  <p className="truncate font-light">
+                    {post.title}
+                    {!post.published && (
+                      <span className="ml-2 text-xs uppercase tracking-wide text-ink/45">
+                        hidden
+                      </span>
+                    )}
+                  </p>
+                  <p className="mt-0.5 text-xs font-light text-ink/50">
+                    /journal/{post.slug} · {post.category || "Uncategorised"} ·{" "}
+                    {post.date || "no date"}
+                  </p>
+                </div>
               </div>
               <div className="flex shrink-0 gap-1.5">
                 <button
@@ -329,6 +340,128 @@ export default function JournalTab({ onUnauthorised }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * The article's picture: upload one from the computer (drag it in or browse),
+ * or paste a URL. Uploads go to R2 and the post keeps the object key, so the
+ * link is refreshed on every read instead of quietly expiring.
+ */
+function PictureField({ form, setForm, setError, onUnauthorised }) {
+  const inputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+
+  async function upload(file) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      return setError("Choose a JPG or PNG picture.");
+    }
+    if (file.size > MAX_PICTURE_MB * 1024 * 1024) {
+      return setError(`Pictures must be ${MAX_PICTURE_MB}MB or smaller.`);
+    }
+    setUploading(true);
+    setError("");
+    try {
+      const body = new FormData();
+      body.append("image", file);
+      const { key, src } = await apiUpload("/api/admin/journal/image", body);
+      setForm((current) => ({ ...current, imageKey: key, imageSrc: src }));
+    } catch (err) {
+      if (err.unauthorised) return onUnauthorised();
+      setError(err.message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  const update = (fields) => setForm((current) => ({ ...current, ...fields }));
+
+  return (
+    <div className="sm:col-span-2">
+      <p className="text-xs uppercase tracking-wide text-ink/50">Picture</p>
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragActive(true);
+        }}
+        onDragLeave={() => setDragActive(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragActive(false);
+          upload(e.dataTransfer.files[0]);
+        }}
+        className={`mt-2 flex flex-wrap items-center gap-4 border border-dashed p-3 transition-colors ${
+          dragActive ? "border-ambleside bg-linen-deep" : "border-ink/15"
+        }`}
+      >
+        {form.imageSrc ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={form.imageSrc}
+            alt=""
+            className="h-24 w-36 shrink-0 border border-ink/10 object-cover"
+          />
+        ) : (
+          <div className="flex h-24 w-36 shrink-0 items-center justify-center bg-linen-deep text-xs font-light text-ink/45">
+            No picture
+          </div>
+        )}
+        <div className="flex flex-col items-start gap-2">
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={uploading}
+            className={BTN_SMALL}
+          >
+            {uploading
+              ? "Uploading…"
+              : form.imageSrc
+                ? "Replace picture"
+                : "Upload picture"}
+          </button>
+          {form.imageSrc && (
+            <button
+              type="button"
+              onClick={() => update({ imageSrc: "", imageKey: "" })}
+              className={BTN_SMALL}
+            >
+              Remove picture
+            </button>
+          )}
+          <p className="text-xs font-light text-ink/45">
+            Drag one in, or browse — JPG or PNG up to {MAX_PICTURE_MB}MB
+          </p>
+        </div>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(e) => {
+            upload(e.target.files[0]);
+            e.target.value = "";
+          }}
+        />
+      </div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <input
+          placeholder="…or paste a picture URL"
+          aria-label="Picture URL"
+          value={form.imageSrc}
+          onChange={(e) => update({ imageSrc: e.target.value, imageKey: "" })}
+          className={INPUT}
+        />
+        <input
+          placeholder="Picture description (alt text)"
+          aria-label="Picture description"
+          value={form.imageLabel}
+          onChange={(e) => update({ imageLabel: e.target.value })}
+          className={INPUT}
+        />
+      </div>
     </div>
   );
 }

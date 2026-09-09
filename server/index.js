@@ -10,6 +10,7 @@ const contactRoutes = require("./routes/contact");
 const journalRoutes = require("./routes/journal");
 const adminRoutes = require("./routes/admin");
 const JournalPost = require("./models/JournalPost");
+const { backfillPhoneKeys } = require("./utils/customers");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -50,8 +51,15 @@ app.use("/api/admin", adminLimiter, adminRoutes);
 // Central error handler (multer errors land here too)
 app.use((err, req, res, next) => {
   console.error(err);
-  const status = err.name === "MulterError" ? 400 : 500;
-  res.status(status).json({ error: "Something went wrong." });
+  if (err.name === "MulterError") {
+    return res.status(400).json({
+      error:
+        err.code === "LIMIT_FILE_SIZE"
+          ? "That file is too large — 8MB maximum."
+          : "That upload could not be read.",
+    });
+  }
+  res.status(500).json({ error: "Something went wrong." });
 });
 
 /** First run only: load the original journal articles into MongoDB. */
@@ -66,7 +74,18 @@ async function seedJournal() {
   }
 }
 
+/** Records saved before phoneKey existed still need one to sort and match on. */
+async function backfillCustomers() {
+  try {
+    const filled = await backfillPhoneKeys();
+    if (filled) console.log(`Phone numbers indexed for ${filled} customers`);
+  } catch (err) {
+    console.error("Customer phone backfill failed:", err.message);
+  }
+}
+
 connectDb().then(async () => {
   await seedJournal();
+  await backfillCustomers();
   app.listen(PORT, () => console.log(`alterique API listening on :${PORT}`));
 });

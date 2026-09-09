@@ -17,6 +17,12 @@ const journalPostSchema = new mongoose.Schema(
     readTime: { type: String, trim: true, maxlength: 30 },
     image: {
       src: { type: String, trim: true, maxlength: 500 },
+      /**
+       * R2 object key for a picture uploaded from the admin panel. When it is
+       * set, `src` is a fresh link resolved on every read (utils/journalImage.js)
+       * rather than the possibly-expired one stored here.
+       */
+      key: { type: String, trim: true, maxlength: 300 },
       label: { type: String, trim: true, maxlength: 200 },
       tone: { type: String, trim: true, maxlength: 20 },
     },

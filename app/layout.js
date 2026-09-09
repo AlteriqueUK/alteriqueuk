@@ -3,6 +3,7 @@ import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import MobileContactBar from "@/components/layout/MobileContactBar";
 import { localBusinessSchema, JsonLd } from "@/lib/schema";
+import { getGoogleRating } from "@/lib/google-reviews";
 import { siteConfig } from "@/lib/site-config";
 import "./globals.css";
 
@@ -37,7 +38,7 @@ export const metadata = {
   robots: { index: true, follow: true },
 };
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
   return (
     <html
       lang="en-GB"
@@ -58,7 +59,7 @@ export default function RootLayout({ children }) {
         {/* Spacer so the fixed mobile contact bar never covers the footer */}
         <div aria-hidden className="h-11 md:hidden" />
         <MobileContactBar />
-        <JsonLd schema={localBusinessSchema()} />
+        <JsonLd schema={localBusinessSchema(await getGoogleRating())} />
       </body>
     </html>
   );

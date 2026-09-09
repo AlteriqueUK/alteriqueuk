@@ -1,8 +1,11 @@
 import Link from "next/link";
 import EditorialImage from "@/components/shared/EditorialImage";
+import { getGoogleRating } from "@/lib/google-reviews";
 import { siteConfig } from "@/lib/site-config";
 
-export default function Hero() {
+export default async function Hero() {
+  const { rating, reviewCount } = await getGoogleRating();
+
   return (
     <section className="container-site grid items-center gap-10 py-14 sm:py-16 lg:grid-cols-2 lg:gap-16 lg:py-20">
       <div className="max-w-xl">
@@ -41,8 +44,7 @@ export default function Hero() {
         </div>
         <p className="mt-10 text-[13px] tracking-[0.04em] text-ink/60">
           <span className="text-champagne">★★★★★</span>{" "}
-          {siteConfig.google.rating} — {siteConfig.google.reviewCount} Google
-          reviews
+          {rating} — {reviewCount} Google reviews
         </p>
       </div>
       <EditorialImage

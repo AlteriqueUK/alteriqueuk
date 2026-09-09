@@ -17,16 +17,12 @@ export function clearToken() {
   window.localStorage.removeItem(TOKEN_KEY);
 }
 
-export async function api(path, { method = "GET", body } = {}) {
+function authHeader() {
   const token = getToken();
-  const res = await fetch(`${siteConfig.apiUrl}${path}`, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function unwrap(res, path) {
   if (res.status === 401 && !path.endsWith("/login")) {
     clearToken();
     const err = new Error("Session expired — please sign in again.");
@@ -34,6 +30,34 @@ export async function api(path, { method = "GET", body } = {}) {
     throw err;
   }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || "Request failed.");
+  if (!res.ok) {
+    const err = new Error(data.error || "Request failed.");
+    err.status = res.status;
+    // Some errors carry detail with them — a duplicate customer's id, say
+    err.data = data;
+    throw err;
+  }
   return data;
+}
+
+export async function api(path, { method = "GET", body } = {}) {
+  const res = await fetch(`${siteConfig.apiUrl}${path}`, {
+    method,
+    headers: { "Content-Type": "application/json", ...authHeader() },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  return unwrap(res, path);
+}
+
+/**
+ * Multipart upload (journal pictures). No Content-Type header — the browser
+ * sets it along with the multipart boundary.
+ */
+export async function apiUpload(path, formData) {
+  const res = await fetch(`${siteConfig.apiUrl}${path}`, {
+    method: "POST",
+    headers: authHeader(),
+    body: formData,
+  });
+  return unwrap(res, path);
 }

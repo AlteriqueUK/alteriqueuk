@@ -25,10 +25,20 @@ const client = configured
     })
   : null;
 
-async function uploadPhoto(file) {
+/**
+ * Stores one uploaded image and returns its object key.
+ * `prefix` keeps the bucket tidy — "quotes" for garment photos sent with a
+ * quote request, "journal" for pictures uploaded from the admin panel.
+ */
+async function uploadPhoto(file, prefix = "quotes") {
   if (!client) return null;
-  const ext = (file.originalname.split(".").pop() || "jpg").toLowerCase();
-  const key = `quotes/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+  const parts = file.originalname.split(".");
+  const ext =
+    (parts.length > 1 ? parts.pop() : "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "")
+      .slice(0, 5) || "jpg";
+  const key = `${prefix}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
   await client.send(
     new PutObjectCommand({
       Bucket: process.env.R2_BUCKET,
