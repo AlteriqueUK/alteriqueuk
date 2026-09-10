@@ -11,7 +11,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import Wordmark from "@/components/layout/Wordmark";
+import Logo from "@/components/layout/Logo";
 import { siteConfig } from "@/lib/site-config";
 import { cn } from "@/lib/utils";
 
@@ -54,7 +54,7 @@ export default function Navbar() {
     >
       <div className="container-site flex h-16 items-center justify-between md:h-20">
         <Link href="/" aria-label="alterique — home" className="text-ink">
-          <Wordmark />
+          <Logo className="md:h-8" />
         </Link>
 
         {/* Desktop nav */}
@@ -125,7 +125,7 @@ export default function Navbar() {
             <SheetContent side="right" className="w-80 border-ink/10 bg-linen">
               <SheetHeader>
                 <SheetTitle className="text-left">
-                  <Wordmark className="text-ink" />
+                  <Logo alt="alterique" />
                 </SheetTitle>
               </SheetHeader>
               <nav
