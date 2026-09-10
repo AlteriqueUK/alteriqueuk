@@ -89,18 +89,38 @@ quiet period takes ~30s. The quote form shows a "Sending…" state to cover this
 ## Email notifications
 
 Quote requests and contact messages are emailed to **alteriqueforuk@gmail.com**
-(override with `NOTIFY_EMAIL`). Two variables turn this on:
+(override with `NOTIFY_EMAIL`). Any SMTP provider works — name one in
+`MAIL_PROVIDER` and its host, port and username are filled in for you, so
+usually only the API key is left to set.
 
-| Variable    | Value                                                        |
-| ----------- | ------------------------------------------------------------ |
-| `SMTP_USER` | The Gmail address that sends them                            |
-| `SMTP_PASS` | A **16-character App Password** — not the account password  |
+| `MAIL_PROVIDER` | Also set                                    | Free tier    |
+| --------------- | ------------------------------------------- | ------------ |
+| `resend`        | `SMTP_PASS` = API key — **nothing else**    | 3,000/month  |
+| `brevo`         | `SMTP_PASS`, `SMTP_USER`, `MAIL_FROM`       | 300/day      |
+| `sendgrid`      | `SMTP_PASS` = API key, `MAIL_FROM`          | 100/day      |
+| `postmark`      | `SMTP_PASS` = server token, `MAIL_FROM`     | 100/month    |
+| `mailgun`       | `SMTP_PASS`, `SMTP_USER` = postmaster@…     | trial        |
+| `zoho` `outlook` `gmail` | `SMTP_PASS`, `SMTP_USER`           | mailbox      |
 
-Gmail refuses the ordinary account password outright, with
-`535 5.7.8 Username and Password not accepted`. Create an App Password at
-**Google Account → Security → 2-Step Verification → App passwords** (2-Step
-Verification has to be on first). The host and port already default to
-Gmail's `smtp.gmail.com:587`, so nothing else needs setting.
+Anything else: `MAIL_PROVIDER=smtp` plus `SMTP_HOST` and `SMTP_PORT`.
+
+**Recommended — Resend.** Two variables and it works:
+
+```
+MAIL_PROVIDER=resend
+SMTP_PASS=re_xxxxxxxxxxxx
+```
+
+It sends from `onboarding@resend.dev`, Resend's sandbox sender, which delivers
+to the address the Resend account was opened with — so open the account with
+alteriqueforuk@gmail.com and there is no domain to verify. Later, verify
+alterique.co.uk with Resend and set `MAIL_FROM=alterique <hello@alterique.co.uk>`
+to send from your own domain.
+
+Two things every third party has in common: `SMTP_PASS` is an API key rather
+than a password, and `MAIL_FROM` must be an address you have verified with
+them — they will not send from an address you do not own. The API refuses to
+start sending with a half-finished setup and names the missing piece instead.
 
 **To check it works:** open the admin panel, Quotations tab, and press
 *Send test email*. It sends a real notification down the same path a quote
@@ -108,9 +128,9 @@ request takes and shows the mail server's own words if it fails. The API also
 prints the verdict on startup:
 
 ```
-Email ready: sending as alteriqueforuk@gmail.com → alteriqueforuk@gmail.com
-EMAIL BROKEN — smtp.gmail.com:587 as … refused the login: Invalid login: 535 …
-EMAIL OFF — set SMTP_USER and SMTP_PASS (Gmail needs an App Password).
+Email ready via resend: sending as alterique <onboarding@resend.dev> → alteriqueforuk@gmail.com
+EMAIL BROKEN — resend (smtp.resend.com:587) turned us away: Invalid login: 535 …
+EMAIL OFF (sendgrid) — MAIL_FROM is not set — sendgrid needs a sender address …
 ```
 
 A failed email never loses an enquiry — it is written to MongoDB first and is

@@ -93,7 +93,7 @@ async function reportMail() {
   const status = mailStatus();
   if (!status.configured) {
     console.warn(
-      "EMAIL OFF — set SMTP_USER and SMTP_PASS (Gmail needs an App Password). " +
+      `EMAIL OFF (${status.provider}) — ${status.problem} ` +
         "Quote requests are still stored and visible in the admin panel."
     );
     return;
@@ -101,8 +101,8 @@ async function reportMail() {
   const { ok, error } = await verifyMail();
   console.log(
     ok
-      ? `Email ready: sending as ${status.user} → ${status.notify}`
-      : `EMAIL BROKEN — ${status.host}:${status.port} as ${status.user} refused the login: ${error}`
+      ? `Email ready via ${status.provider}: sending as ${status.from} → ${status.notify}`
+      : `EMAIL BROKEN — ${status.provider} (${status.host}:${status.port}) turned us away: ${error}`
   );
 }
 

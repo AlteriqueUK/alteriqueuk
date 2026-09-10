@@ -3,31 +3,103 @@ const nodemailer = require("nodemailer");
 /**
  * Email notifications for quote requests and contact messages.
  *
- * Gmail needs an App Password, not the Google account password — Google
- * rejects the account password outright:
- *   Google Account → Security → 2-Step Verification → App passwords
- * Set SMTP_USER to the Gmail address and SMTP_PASS to that 16-character
- * password; the host and port already default to Gmail's.
+ * Any SMTP provider works. Pick one with MAIL_PROVIDER and its host, port and
+ * username are filled in for you — usually all that is left is the API key in
+ * SMTP_PASS. MAIL_PROVIDER=smtp (or an unknown name) means "I will set
+ * SMTP_HOST and SMTP_PORT myself".
  *
  * Nothing here can lose a submission — it is stored in MongoDB before the
  * email is attempted, and a failure is recorded rather than thrown, so the
  * admin panel can show what went wrong instead of failing silently.
  */
 
+const PROVIDERS = {
+  // key            host                      port  fixed username / notes
+  resend: {
+    host: "smtp.resend.com",
+    port: 587,
+    user: "resend",
+    // Resend's sandbox sender: works with no domain of your own, but only
+    // delivers to the address the Resend account was opened with
+    from: "alterique <onboarding@resend.dev>",
+    pass: "the API key from resend.com/api-keys",
+  },
+  brevo: {
+    host: "smtp-relay.brevo.com",
+    port: 587,
+    pass: "the SMTP key from Brevo → SMTP & API",
+    note: "SMTP_USER is the login shown on that same page, not your email.",
+  },
+  sendgrid: {
+    host: "smtp.sendgrid.net",
+    port: 587,
+    user: "apikey", // literally the word "apikey"
+    pass: "the API key from SendGrid → Settings → API Keys",
+  },
+  mailgun: {
+    host: "smtp.mailgun.org",
+    port: 587,
+    pass: "the SMTP password from the Mailgun domain page",
+    note: "SMTP_USER is postmaster@your-domain.",
+  },
+  postmark: {
+    host: "smtp.postmarkapp.com",
+    port: 587,
+    useTokenAsUser: true, // username and password are both the server token
+    pass: "the Server API token",
+  },
+  zoho: { host: "smtp.zoho.eu", port: 465 },
+  outlook: { host: "smtp.office365.com", port: 587 },
+  gmail: {
+    host: "smtp.gmail.com",
+    port: 587,
+    pass: "a 16-character App Password — Google rejects the account password",
+  },
+};
+
 /** Where quote and contact notifications land. */
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || "alteriqueforuk@gmail.com";
 
-const SMTP_HOST = process.env.SMTP_HOST || "smtp.gmail.com";
-const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
-const SMTP_USER = process.env.SMTP_USER;
+const PROVIDER = (process.env.MAIL_PROVIDER || "gmail").trim().toLowerCase();
+const preset = PROVIDERS[PROVIDER];
+
 const SMTP_PASS = process.env.SMTP_PASS;
+const SMTP_HOST = process.env.SMTP_HOST || (preset ? preset.host : "");
+const SMTP_PORT = Number(process.env.SMTP_PORT || (preset ? preset.port : 587));
+const SMTP_USER =
+  process.env.SMTP_USER ||
+  (preset && preset.user) ||
+  (preset && preset.useTokenAsUser ? SMTP_PASS : "") ||
+  "";
 
-// Gmail only lets you send as the account you signed in with, so the sender
-// is that address with a friendly name on it
+// Third-party senders only deliver from an address you have verified with
+// them, so this cannot just be assumed the way it can with Gmail
 const MAIL_FROM =
-  process.env.MAIL_FROM || (SMTP_USER ? `alterique <${SMTP_USER}>` : "");
+  process.env.MAIL_FROM ||
+  (preset && preset.from) ||
+  (SMTP_USER.includes("@") ? `alterique <${SMTP_USER}>` : "");
 
-const configured = Boolean(SMTP_USER && SMTP_PASS);
+/** The one thing stopping email from working, in the order worth fixing. */
+function configProblem() {
+  if (!SMTP_PASS) {
+    const what = preset && preset.pass ? preset.pass : "the SMTP password";
+    return `SMTP_PASS is not set — it should be ${what}.`;
+  }
+  if (!SMTP_HOST) {
+    return `MAIL_PROVIDER "${PROVIDER}" is not one I know (${Object.keys(PROVIDERS).join(", ")}) — set SMTP_HOST and SMTP_PORT yourself.`;
+  }
+  if (!SMTP_USER) {
+    const note = preset && preset.note ? ` ${preset.note}` : "";
+    return `SMTP_USER is not set.${note}`;
+  }
+  if (!MAIL_FROM) {
+    return `MAIL_FROM is not set — ${PROVIDER} needs a sender address you have verified with them, e.g. "alterique <hello@alterique.co.uk>".`;
+  }
+  return null;
+}
+
+const problem = configProblem();
+const configured = !problem;
 
 const transporter = configured
   ? nodemailer.createTransport({
@@ -41,13 +113,10 @@ const transporter = configured
 /** What happened last time, so the panel can report rather than guess. */
 const state = { lastError: null, lastSentAt: null, verified: null };
 
-const NOT_CONFIGURED =
-  "Email is not set up on the API — SMTP_USER and SMTP_PASS are missing.";
-
 async function send(to, subject, text, { html, replyTo } = {}) {
   if (!transporter) {
-    state.lastError = NOT_CONFIGURED;
-    console.warn(`Mail skipped ("${subject}"): ${NOT_CONFIGURED}`);
+    state.lastError = problem;
+    console.warn(`Mail skipped ("${subject}"): ${problem}`);
     return false;
   }
   if (!to) {
@@ -75,8 +144,8 @@ async function notifyBusiness(subject, text, options) {
 async function verifyMail() {
   if (!transporter) {
     state.verified = false;
-    state.lastError = NOT_CONFIGURED;
-    return { ok: false, error: NOT_CONFIGURED };
+    state.lastError = problem;
+    return { ok: false, error: problem };
   }
   try {
     await transporter.verify();
@@ -115,7 +184,7 @@ async function sendTestEmail() {
           ["Sent", when],
           ["Goes to", NOTIFY_EMAIL],
           ["Sent as", MAIL_FROM],
-          ["Server", `${SMTP_HOST}:${SMTP_PORT}`],
+          ["Sent via", `${PROVIDER} (${SMTP_HOST}:${SMTP_PORT})`],
         ],
         { footerNote: "Triggered from the admin panel" }
       ),
@@ -129,6 +198,9 @@ async function sendTestEmail() {
 function mailStatus() {
   return {
     configured,
+    problem,
+    provider: PROVIDER,
+    providers: Object.keys(PROVIDERS),
     host: SMTP_HOST,
     port: SMTP_PORT,
     user: SMTP_USER || null,

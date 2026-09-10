@@ -62,6 +62,9 @@ export default function MailStatus({ onUnauthorised }) {
             <>
               Quote notifications go to{" "}
               <span className="font-normal">{status.notify}</span>
+              {status.provider && (
+                <span className="text-ink/50"> via {status.provider}</span>
+              )}
             </>
           ) : (
             <>Email is off — quote requests are saved here, but not emailed.</>
@@ -78,11 +81,8 @@ export default function MailStatus({ onUnauthorised }) {
         </button>
       </div>
 
-      {!on && (
-        <p className="mt-2 text-xs font-light text-ink/60">
-          Set <code>SMTP_USER</code> and <code>SMTP_PASS</code> on the API —
-          Gmail needs an App Password, not the account password.
-        </p>
+      {!on && status.problem && (
+        <p className="mt-2 text-xs font-light text-ink/60">{status.problem}</p>
       )}
 
       {on && status.lastError && !result && (
