@@ -27,6 +27,8 @@ Both form POST routes are rate-limited (20 requests / 15 min / IP).
 | GET    | `/journal`                    | All articles, published or not                 |
 | POST   | `/journal/image`              | Article picture — multipart, one image ≤8MB   |
 | POST   | `/journal` `PUT /journal/:id` | Create / edit an article                       |
+| GET    | `/mail`                       | Whether email is set up, and what went wrong   |
+| POST   | `/mail/test`                  | Send a real test notification                  |
 
 ## No duplicate customers
 
@@ -60,12 +62,13 @@ frontend host.
 ```bash
 cd server
 npm install
-cp .env.example .env   # fill in MONGODB_URI at minimum
+cp .env.example .env   # every variable is listed and explained there
 npm run dev
 ```
 
 R2 and SMTP settings are optional — without them, photos are skipped and
-emails aren't sent, but every submission is still stored in MongoDB.
+emails aren't sent, but every submission is still stored in MongoDB. The API
+says which of them are on when it starts up.
 
 ## Deploying to Render (free tier)
 
@@ -82,6 +85,36 @@ emails aren't sent, but every submission is still stored in MongoDB.
 
 Note: free-tier services sleep after inactivity — the first request after a
 quiet period takes ~30s. The quote form shows a "Sending…" state to cover this.
+
+## Email notifications
+
+Quote requests and contact messages are emailed to **alteriqueforuk@gmail.com**
+(override with `NOTIFY_EMAIL`). Two variables turn this on:
+
+| Variable    | Value                                                        |
+| ----------- | ------------------------------------------------------------ |
+| `SMTP_USER` | The Gmail address that sends them                            |
+| `SMTP_PASS` | A **16-character App Password** — not the account password  |
+
+Gmail refuses the ordinary account password outright, with
+`535 5.7.8 Username and Password not accepted`. Create an App Password at
+**Google Account → Security → 2-Step Verification → App passwords** (2-Step
+Verification has to be on first). The host and port already default to
+Gmail's `smtp.gmail.com:587`, so nothing else needs setting.
+
+**To check it works:** open the admin panel, Quotations tab, and press
+*Send test email*. It sends a real notification down the same path a quote
+request takes and shows the mail server's own words if it fails. The API also
+prints the verdict on startup:
+
+```
+Email ready: sending as alteriqueforuk@gmail.com → alteriqueforuk@gmail.com
+EMAIL BROKEN — smtp.gmail.com:587 as … refused the login: Invalid login: 535 …
+EMAIL OFF — set SMTP_USER and SMTP_PASS (Gmail needs an App Password).
+```
+
+A failed email never loses an enquiry — it is written to MongoDB first and is
+always readable in the admin panel.
 
 ## Cloudflare R2 setup
 

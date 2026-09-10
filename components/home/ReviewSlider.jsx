@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 /** How long each review holds before the next one slides in. */
-const HOLD_MS = 7000;
+const HOLD_MS = 4500;
 
 /**
  * Reviews, one at a time, moving along on their own — no arrows to press.
@@ -50,7 +50,7 @@ export default function ReviewSlider({ reviews }) {
         aria-label="What customers say"
       >
         <div
-          className="flex transition-transform duration-700 ease-out motion-reduce:transition-none"
+          className="flex transition-transform duration-500 ease-out motion-reduce:transition-none"
           style={{ transform: `translateX(-${index * 100}%)` }}
         >
           {reviews.map((review, i) => (

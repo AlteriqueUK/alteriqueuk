@@ -11,6 +11,7 @@ const journalRoutes = require("./routes/journal");
 const adminRoutes = require("./routes/admin");
 const JournalPost = require("./models/JournalPost");
 const { backfillPhoneKeys } = require("./utils/customers");
+const { mailStatus, verifyMail } = require("./utils/mailer");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -84,8 +85,31 @@ async function backfillCustomers() {
   }
 }
 
+/**
+ * Says plainly, at boot, whether quote notifications will actually arrive —
+ * a wrong password used to show up only as silence.
+ */
+async function reportMail() {
+  const status = mailStatus();
+  if (!status.configured) {
+    console.warn(
+      "EMAIL OFF — set SMTP_USER and SMTP_PASS (Gmail needs an App Password). " +
+        "Quote requests are still stored and visible in the admin panel."
+    );
+    return;
+  }
+  const { ok, error } = await verifyMail();
+  console.log(
+    ok
+      ? `Email ready: sending as ${status.user} → ${status.notify}`
+      : `EMAIL BROKEN — ${status.host}:${status.port} as ${status.user} refused the login: ${error}`
+  );
+}
+
 connectDb().then(async () => {
   await seedJournal();
   await backfillCustomers();
   app.listen(PORT, () => console.log(`alterique API listening on :${PORT}`));
+  // After listen, so a slow SMTP handshake never delays the health check
+  reportMail();
 });

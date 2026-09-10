@@ -9,6 +9,7 @@ const { login, requireAdmin } = require("../utils/adminAuth");
 const { photoUrl, photoUrls, uploadPhoto, r2Configured } = require("../config/r2");
 const { findDuplicate, mergeDuplicates } = require("../utils/customers");
 const { withImageUrl, withImageUrls } = require("../utils/journalImage");
+const { mailStatus, sendTestEmail } = require("../utils/mailer");
 
 const router = express.Router();
 
@@ -30,6 +31,24 @@ router.post("/login", loginLimiter, (req, res) => {
 
 // Everything below requires a valid admin token
 router.use(requireAdmin);
+
+// --- Email notifications ---
+
+/** What the panel needs to say whether quote emails will arrive. */
+router.get("/mail", (req, res) => {
+  res.json(mailStatus());
+});
+
+/** Sends a real notification down the same path a quote request takes. */
+router.post("/mail/test", async (req, res) => {
+  try {
+    const { to } = await sendTestEmail();
+    res.json({ ok: true, to });
+  } catch (err) {
+    // 502: the API is fine, the mail server turned us away
+    res.status(502).json({ error: err.message });
+  }
+});
 
 // --- Quotations ---
 
