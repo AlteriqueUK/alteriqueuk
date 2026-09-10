@@ -101,8 +101,11 @@ async function reportMail() {
   const { ok, error } = await verifyMail();
   console.log(
     ok
-      ? `Email ready via ${status.provider}: sending as ${status.from} → ${status.notify}`
-      : `EMAIL BROKEN — ${status.provider} (${status.host}:${status.port}) turned us away: ${error}`
+      ? `Email ready via ${status.provider} over ${status.transport}: sending as ${status.from} → ${status.notify}`
+      : `EMAIL BROKEN — ${status.provider} over ${status.transport} turned us away: ${error}` +
+        (status.transport === "smtp" && /timeout/i.test(error || "")
+          ? " — this host almost certainly blocks outbound SMTP; use a provider with an HTTPS API."
+          : "")
   );
 }
 

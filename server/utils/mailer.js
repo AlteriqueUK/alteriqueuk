@@ -19,6 +19,7 @@ const PROVIDERS = {
     host: "smtp.resend.com",
     port: 587,
     user: "resend",
+    api: "https://api.resend.com", // preferred: see MAIL_TRANSPORT below
     // Resend's sandbox sender: works with no domain of your own, but only
     // delivers to the address the Resend account was opened with
     from: "alterique <onboarding@resend.dev>",
@@ -101,20 +102,59 @@ function configProblem() {
 const problem = configProblem();
 const configured = !problem;
 
-const transporter = configured
-  ? nodemailer.createTransport({
-      host: SMTP_HOST,
-      port: SMTP_PORT,
-      secure: SMTP_PORT === 465, // 587 upgrades with STARTTLS instead
-      auth: { user: SMTP_USER, pass: SMTP_PASS },
-    })
-  : null;
+/**
+ * Render — and most other managed hosts — block outbound SMTP ports (25, 465,
+ * 587) outright to stop their machines being used for spam. The connection
+ * does not fail, it hangs: "Connection timeout" with a perfectly good
+ * configuration. So where a provider offers an HTTPS API, that is used
+ * instead; port 443 is never blocked. Set MAIL_TRANSPORT=smtp to force the
+ * old path (fine locally, not on Render).
+ */
+const API_BASE = preset && preset.api;
+const TRANSPORT =
+  (process.env.MAIL_TRANSPORT || "").toLowerCase() === "smtp" || !API_BASE
+    ? "smtp"
+    : "https";
+
+const transporter =
+  configured && TRANSPORT === "smtp"
+    ? nodemailer.createTransport({
+        host: SMTP_HOST,
+        port: SMTP_PORT,
+        secure: SMTP_PORT === 465, // 587 upgrades with STARTTLS instead
+        auth: { user: SMTP_USER, pass: SMTP_PASS },
+      })
+    : null;
+
+/** Resend's REST API. Same message, over HTTPS. */
+async function sendOverHttps({ to, subject, text, html, replyTo }) {
+  const res = await fetch(`${API_BASE}/emails`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${SMTP_PASS}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: MAIL_FROM,
+      to: [to],
+      subject,
+      text,
+      ...(html ? { html } : {}),
+      ...(replyTo ? { reply_to: replyTo } : {}),
+    }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body.message || `Resend refused the message (${res.status}).`);
+  }
+  return body;
+}
 
 /** What happened last time, so the panel can report rather than guess. */
 const state = { lastError: null, lastSentAt: null, verified: null };
 
 async function send(to, subject, text, { html, replyTo } = {}) {
-  if (!transporter) {
+  if (!configured) {
     state.lastError = problem;
     console.warn(`Mail skipped ("${subject}"): ${problem}`);
     return false;
@@ -124,7 +164,11 @@ async function send(to, subject, text, { html, replyTo } = {}) {
     return false;
   }
   try {
-    await transporter.sendMail({ from: MAIL_FROM, to, subject, text, html, replyTo });
+    if (TRANSPORT === "https") {
+      await sendOverHttps({ to, subject, text, html, replyTo });
+    } else {
+      await transporter.sendMail({ from: MAIL_FROM, to, subject, text, html, replyTo });
+    }
     state.lastSentAt = new Date().toISOString();
     state.lastError = null;
     return true;
@@ -140,15 +184,23 @@ async function notifyBusiness(subject, text, options) {
   return send(NOTIFY_EMAIL, subject, text, options);
 }
 
-/** Signs in to the SMTP server without sending anything. */
+/** Checks the credentials without sending anything. */
 async function verifyMail() {
-  if (!transporter) {
+  if (!configured) {
     state.verified = false;
     state.lastError = problem;
     return { ok: false, error: problem };
   }
   try {
-    await transporter.verify();
+    if (TRANSPORT === "https") {
+      // A key with send-only scope answers 403 here — still a valid key
+      const res = await fetch(`${API_BASE}/domains`, {
+        headers: { Authorization: `Bearer ${SMTP_PASS}` },
+      });
+      if (res.status === 401) throw new Error("The API key was rejected.");
+    } else {
+      await transporter.verify();
+    }
     state.verified = true;
     state.lastError = null;
     return { ok: true };
@@ -184,7 +236,12 @@ async function sendTestEmail() {
           ["Sent", when],
           ["Goes to", NOTIFY_EMAIL],
           ["Sent as", MAIL_FROM],
-          ["Sent via", `${PROVIDER} (${SMTP_HOST}:${SMTP_PORT})`],
+          [
+            "Sent via",
+            TRANSPORT === "https"
+              ? `${PROVIDER} over HTTPS`
+              : `${PROVIDER} (${SMTP_HOST}:${SMTP_PORT})`,
+          ],
         ],
         { footerNote: "Triggered from the admin panel" }
       ),
@@ -200,6 +257,7 @@ function mailStatus() {
     configured,
     problem,
     provider: PROVIDER,
+    transport: TRANSPORT,
     providers: Object.keys(PROVIDERS),
     host: SMTP_HOST,
     port: SMTP_PORT,

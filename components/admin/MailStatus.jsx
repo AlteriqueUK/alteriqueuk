@@ -63,7 +63,11 @@ export default function MailStatus({ onUnauthorised }) {
               Quote notifications go to{" "}
               <span className="font-normal">{status.notify}</span>
               {status.provider && (
-                <span className="text-ink/50"> via {status.provider}</span>
+                <span className="text-ink/50">
+                  {" "}
+                  via {status.provider}
+                  {status.transport === "https" ? " (HTTPS)" : ""}
+                </span>
               )}
             </>
           ) : (

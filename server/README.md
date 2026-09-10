@@ -89,13 +89,20 @@ quiet period takes ~30s. The quote form shows a "Sending…" state to cover this
 ## Email notifications
 
 Quote requests and contact messages are emailed to **alteriqueforuk@gmail.com**
-(override with `NOTIFY_EMAIL`). Any SMTP provider works — name one in
-`MAIL_PROVIDER` and its host, port and username are filled in for you, so
-usually only the API key is left to set.
+(override with `NOTIFY_EMAIL`). Name a provider in `MAIL_PROVIDER` and its
+host, port and username are filled in for you, so usually only the API key is
+left to set.
+
+> **On Render, use `resend`.** Render blocks outbound SMTP ports (25, 465,
+> 587) to stop its machines being used for spam. The connection does not fail,
+> it hangs — a perfectly good configuration reports `Connection timeout` and
+> not one email arrives. `resend` is sent over its HTTPS API on port 443
+> instead, which no host blocks. Every other provider below is SMTP-only and
+> will time out on Render.
 
 | `MAIL_PROVIDER` | Also set                                    | Free tier    |
 | --------------- | ------------------------------------------- | ------------ |
-| `resend`        | `SMTP_PASS` = API key — **nothing else**    | 3,000/month  |
+| `resend` (HTTPS)| `SMTP_PASS` = API key — **nothing else**    | 3,000/month  |
 | `brevo`         | `SMTP_PASS`, `SMTP_USER`, `MAIL_FROM`       | 300/day      |
 | `sendgrid`      | `SMTP_PASS` = API key, `MAIL_FROM`          | 100/day      |
 | `postmark`      | `SMTP_PASS` = server token, `MAIL_FROM`     | 100/month    |
@@ -103,6 +110,8 @@ usually only the API key is left to set.
 | `zoho` `outlook` `gmail` | `SMTP_PASS`, `SMTP_USER`           | mailbox      |
 
 Anything else: `MAIL_PROVIDER=smtp` plus `SMTP_HOST` and `SMTP_PORT`.
+`MAIL_TRANSPORT=smtp` forces Resend down the SMTP path too — useful locally,
+never on Render.
 
 **Recommended — Resend.** Two variables and it works:
 
@@ -128,8 +137,9 @@ request takes and shows the mail server's own words if it fails. The API also
 prints the verdict on startup:
 
 ```
-Email ready via resend: sending as alterique <onboarding@resend.dev> → alteriqueforuk@gmail.com
-EMAIL BROKEN — resend (smtp.resend.com:587) turned us away: Invalid login: 535 …
+Email ready via resend over https: sending as alterique <onboarding@resend.dev> → alteriqueforuk@gmail.com
+EMAIL BROKEN — sendgrid over smtp turned us away: Connection timeout — this host
+  almost certainly blocks outbound SMTP; use a provider with an HTTPS API.
 EMAIL OFF (sendgrid) — MAIL_FROM is not set — sendgrid needs a sender address …
 ```
 
